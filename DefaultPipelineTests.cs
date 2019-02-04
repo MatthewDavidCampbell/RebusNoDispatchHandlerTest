@@ -19,7 +19,7 @@ namespace Rebus.NoDispatchHandlers.Tests
 {
     public class DefaultPipelineTests
     {
-        public static Func<IServiceCollection> DefaultServices = () => {
+        private static Func<IServiceCollection> DefaultServices = () => {
             var services = new ServiceCollection();
 
             // activator (handlers)
@@ -57,7 +57,7 @@ namespace Rebus.NoDispatchHandlers.Tests
             return services;
         };
 
-        public static async Task Invoke(ServiceProvider provider, string id, bool isTimebomb = false) {
+        private static async Task Invoke(ServiceProvider provider, string id, bool isTimebomb = false) {
             var context = new FakeTransactionContext();
 
             var msg = new Message(
@@ -124,12 +124,13 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             var errorTracker = provider.GetService<IErrorTracker>();
-            var distinctExceptionsCount = Enumerable.Range(1, 10)
+            var distinctExceptions = Enumerable.Range(1, 10)
                 .Where(x => x % 2 == 0)
                 .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
                 .GroupBy(x => x.Name)
-                .Count();
-            Assert.Equal(1, distinctExceptionsCount);
+                .Select(x => x.Key);
+
+            Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
         }
 
         [Theory]
@@ -149,12 +150,13 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             var errorTracker = provider.GetService<IErrorTracker>();
-            var distinctExceptionsCount = Enumerable.Range(1, howMany)
+            var distinctExceptions = Enumerable.Range(1, howMany)
                 .Where(x => x % 2 == 0)
                 .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
                 .GroupBy(x => x.Name)
-                .Count();
-            Assert.Equal(1, distinctExceptionsCount);
+                .Select(x => x.Key);
+
+            Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
         }
     }
 }
