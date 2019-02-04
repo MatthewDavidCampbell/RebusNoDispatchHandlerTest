@@ -124,6 +124,7 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             var errorTracker = provider.GetService<IErrorTracker>();
+            var invoker = provider.GetService<IPipelineInvoker>() as DefaultPipelineInvoker;
             var distinctExceptions = Enumerable.Range(1, 10)
                 .Where(x => x % 2 == 0)
                 .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
@@ -131,6 +132,7 @@ namespace Rebus.NoDispatchHandlers.Tests
                 .Select(x => x.Key);
 
             Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
+            Assert.Equal(5, invoker.NumberOfCompleted);
         }
 
         [Theory]
@@ -150,6 +152,7 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             var errorTracker = provider.GetService<IErrorTracker>();
+            var invoker = provider.GetService<IPipelineInvoker>() as DefaultPipelineInvoker;
             var distinctExceptions = Enumerable.Range(1, howMany)
                 .Where(x => x % 2 == 0)
                 .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
@@ -157,6 +160,7 @@ namespace Rebus.NoDispatchHandlers.Tests
                 .Select(x => x.Key);
 
             Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
+            Assert.Equal((int)(howMany / 2), invoker.NumberOfCompleted);
         }
     }
 }

@@ -3,16 +3,17 @@ using System.Threading.Tasks;
 using Rebus.Pipeline;
 
 /// <summary>
-/// NOTE: Copied from the Rebus repo (latest)
+/// NOTE: Copied from the Rebus repo (latest) which a slight twist to gather then number
+/// of terminating steps that got called (completed)
 /// </summary>
 namespace Rebus.NoDispatchHandlers.Tests
 {
     public class DefaultPipelineInvoker : IPipelineInvoker
     {
-        static readonly Task<int> Noop = Task.FromResult(0);
-        static readonly Func<Task> TerminationStep = () => Noop;
+        private int noopCounter = 0;
 
         readonly Func<IncomingStepContext, Task> _processIncoming;
+
         readonly Func<OutgoingStepContext, Task> _processOutgoing;
 
         /// <summary>
@@ -24,6 +25,11 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             var incomingSteps = pipeline.ReceivePipeline();
             var outgoingSteps = pipeline.SendPipeline();
+
+            Func<Task> TerminationStep = () => {
+                noopCounter++;
+                return Task.FromResult(0);
+            };
 
             Task ProcessIncoming(IncomingStepContext context)
             {
@@ -72,5 +78,7 @@ namespace Rebus.NoDispatchHandlers.Tests
         /// Invokes the pipeline of <see cref="IOutgoingStep"/> steps, passing the given <see cref="OutgoingStepContext"/> to each step as it is invoked
         /// </summary>
         public Task Invoke(OutgoingStepContext context) => _processOutgoing(context);
+
+        public int NumberOfCompleted { get => this.noopCounter; }
     }
 }
