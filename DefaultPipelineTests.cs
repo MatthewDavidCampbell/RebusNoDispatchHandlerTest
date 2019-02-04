@@ -132,21 +132,24 @@ namespace Rebus.NoDispatchHandlers.Tests
             Assert.Equal(1, distinctExceptionsCount);
         }
 
-        [Fact]
-        public async Task When_Invoke100MinimalPipelineWithHalfBombs_ItShould_Complete()
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_InvokeSomeMinimalPipelineWithHalfBombs_ItShould_Complete(int howMany)
         {
             // Arrange
             var services = DefaultServices();
             var provider = services.BuildServiceProvider();
 
             // Act
-            var calls = Enumerable.Range(1, 100)
+            var calls = Enumerable.Range(1, howMany)
                 .Select(x => Invoke(provider, x.ToString(), x % 2 == 0));
             await Task.WhenAll(calls);
 
             // Assert
             var errorTracker = provider.GetService<IErrorTracker>();
-            var distinctExceptionsCount = Enumerable.Range(1, 100)
+            var distinctExceptionsCount = Enumerable.Range(1, howMany)
                 .Where(x => x % 2 == 0)
                 .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
                 .GroupBy(x => x.Name)
