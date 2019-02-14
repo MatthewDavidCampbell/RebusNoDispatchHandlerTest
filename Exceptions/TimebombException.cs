@@ -1,6 +1,6 @@
 using System;
 
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Exceptions
 {
     public class TimebombException: Exception 
     {

@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Rebus.Transport;
 
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Fakes
 {
     public class FakeTransactionContext : ITransactionContext
     {

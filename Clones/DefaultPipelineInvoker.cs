@@ -6,7 +6,7 @@ using Rebus.Pipeline;
 /// NOTE: Copied from the Rebus repo (latest) which a slight twist to gather then number
 /// of terminating steps that got called (completed)
 /// </summary>
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Clones
 {
     public class DefaultPipelineInvoker : IPipelineInvoker
     {

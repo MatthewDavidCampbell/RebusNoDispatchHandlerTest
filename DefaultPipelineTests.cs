@@ -7,6 +7,10 @@ using Rebus.Activation;
 using Rebus.Handlers;
 using Rebus.Logging;
 using Rebus.Messages;
+using Rebus.NoDispatchHandlers.Tests.Clones;
+using Rebus.NoDispatchHandlers.Tests.Exceptions;
+using Rebus.NoDispatchHandlers.Tests.Fakes;
+using Rebus.NoDispatchHandlers.Tests.Handlers;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Receive;
 using Rebus.Retry;
@@ -19,50 +23,16 @@ namespace Rebus.NoDispatchHandlers.Tests
 {
     public class DefaultPipelineTests
     {
-        private static Func<IServiceCollection> DefaultServices = () => {
-            var services = new ServiceCollection();
+        private static Func<TimebombChangedHandler> TimebombChangedHandlerFactory = () => (TimebombChangedHandler) Activator.CreateInstance(typeof(TimebombChangedHandler));
 
-            // activator (handlers)
-            var activator = new BuiltinHandlerActivator();
-            activator.Register(() => (FakeMessageHandler) Activator.CreateInstance(typeof(FakeMessageHandler)));
-            services.AddSingleton<IHandlerActivator>(activator);
-
-            // settings, error tracker + handler, logging, serializer
-            services.AddSingleton<SimpleRetryStrategySettings>(new SimpleRetryStrategySettings {
-                MaxDeliveryAttempts = 2
-            });
-            services.AddSingleton<IErrorHandler, FakeErrorHandler>();
-            services.AddSingleton<IErrorTracker, FakeErrorTracker>();
-            services.AddSingleton<IRebusLoggerFactory, NullLoggerFactory>();
-            services.AddSingleton<ISerializer, JsonSerializer>();
-
-            // steps
-            services.AddSingleton<IRetryStrategyStep, SimpleRetryStrategyStep>();
-
-            // pipeline
-            IPipeline PipelineFactory(IServiceProvider provider) {
-                var pipeline = new DefaultPipeline()
-                    .OnReceive(provider.GetRequiredService<IRetryStrategyStep>())
-                    .OnReceive(new DeserializeIncomingMessageStep(provider.GetRequiredService<ISerializer>()))
-                    .OnReceive(new ActivateHandlersStep(provider.GetRequiredService<IHandlerActivator>()))
-                    .OnReceive(new DispatchIncomingMessageStep(provider.GetRequiredService<IRebusLoggerFactory>()));
-
-                return pipeline;
-            }
-            services.AddSingleton<IPipeline>(PipelineFactory);
-
-            // invoker
-            services.AddSingleton<IPipelineInvoker>(provider => new DefaultPipelineInvoker(provider.GetRequiredService<IPipeline>()));
-
-            return services;
-        };
+        private static IHandlerActivator DefaultHandlerActivator = new BuiltinHandlerActivator().Register(TimebombChangedHandlerFactory);
 
         private static async Task Invoke(ServiceProvider provider, string id, bool isTimebomb = false) {
             var context = new FakeTransactionContext();
 
             var msg = new Message(
                 new Dictionary<string, string>() { { Headers.MessageId, id } }, 
-                new FakeMessage { isTimebomb = isTimebomb }
+                (ChangedEvent) new TimebombChangedEvent { isTimebomb = isTimebomb }
             );
 
             var serializer = provider.GetService<ISerializer>();
@@ -79,10 +49,10 @@ namespace Rebus.NoDispatchHandlers.Tests
         }
 
         [Fact]
-        public async Task When_InvokeMinimalPipelineWithoutBomb_ItShould_Complete()
+        public async Task When_InvokeMinimalPipelineWithDuds_ItShould_Complete()
         {
             // Arrange
-            var services = DefaultServices();
+            var services = new ServiceCollection().WithDefaultPipeline(DefaultHandlerActivator, "queue");
             var provider = services.BuildServiceProvider();
 
             // Act
@@ -94,10 +64,10 @@ namespace Rebus.NoDispatchHandlers.Tests
         }
 
         [Fact]
-        public async Task When_Invoke10MinimalPipelineWithoutBomb_ItShould_Complete()
+        public async Task When_Invoke10MinimalPipelineWithDuds_ItShould_Complete()
         {
             // Arrange
-            var services = DefaultServices();
+            var services = new ServiceCollection().WithDefaultPipeline(DefaultHandlerActivator, "queue");
             var provider = services.BuildServiceProvider();
 
             // Act
@@ -114,7 +84,7 @@ namespace Rebus.NoDispatchHandlers.Tests
         public async Task When_Invoke10MinimalPipelineWithHalfBombs_ItShould_Complete()
         {
             // Arrange
-            var services = DefaultServices();
+            var services = new ServiceCollection().WithDefaultPipeline(DefaultHandlerActivator, "queue");
             var provider = services.BuildServiceProvider();
 
             // Act
@@ -142,7 +112,7 @@ namespace Rebus.NoDispatchHandlers.Tests
         public async Task When_InvokeSomeMinimalPipelineWithHalfBombs_ItShould_Complete(int howMany)
         {
             // Arrange
-            var services = DefaultServices();
+            var services = new ServiceCollection().WithDefaultPipeline(DefaultHandlerActivator, "queue");
             var provider = services.BuildServiceProvider();
 
             // Act
