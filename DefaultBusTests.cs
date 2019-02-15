@@ -105,5 +105,35 @@ namespace Rebus.NoDispatchHandlers.Tests
             var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
             Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
         }
+
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_SendingWithHalfBombs_ItShould_Retry(int numberOfMessages)
+        {
+            // Arrange
+            var numberOfCalls = (numberOfMessages * 6 + numberOfMessages) / 2;
+            var handler = new TimebombChangedThresholdHandler(numberOfCalls);
+            var services = DefaultServices(handler);
+            var provider = services.BuildServiceProvider();
+            var bus = DefaultBus(provider);
+
+            // Act
+            var calls = Enumerable
+                .Range(1, numberOfMessages)
+                .Select(x => bus.Advanced.Routing.Send(
+                    DefaultQueue, 
+                    new TimebombChangedEvent { isTimebomb = x % 2 == 0 }
+                ));
+            await Task.WhenAll(calls);
+            await handler.WaitThresholdAsync(); 
+
+            // Assert
+            Assert.Equal(numberOfCalls, handler.HandleCalled);
+
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
+        }
     }
 }
