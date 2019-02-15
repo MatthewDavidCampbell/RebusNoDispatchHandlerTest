@@ -26,10 +26,12 @@ namespace Rebus.NoDispatchHandlers.Tests
         /// <param name="handler"></param>
         /// <returns></returns>
         public static IServiceCollection DefaultServices(
-            IHandleMessages<TimebombChangedEvent> handler
+            IHandleMessages<TimebombChangedEvent> handler,
+            int numberOfWorkers = 1
         ) {
             var services = new ServiceCollection();
 
+            services.AddSingleton<Options>(new Options { NumberOfWorkers = numberOfWorkers });
             services.AddSingleton<IHandleMessages<TimebombChangedEvent>>(handler);
 
             services
@@ -46,8 +48,9 @@ namespace Rebus.NoDispatchHandlers.Tests
         public static IBus DefaultBus(
             IServiceProvider provider
         ) {
+            var numberOfWorkers = provider.GetService<Options>().NumberOfWorkers;
             var bus = provider.GetService<RebusBus>();
-            bus.Start(provider.GetService<Options>().NumberOfWorkers);
+            bus.Start(numberOfWorkers);
 
             return bus;
         }
@@ -115,7 +118,7 @@ namespace Rebus.NoDispatchHandlers.Tests
             // Arrange
             var numberOfCalls = (numberOfMessages * 6 + numberOfMessages) / 2;
             var handler = new TimebombChangedThresholdHandler(numberOfCalls);
-            var services = DefaultServices(handler);
+            var services = DefaultServices(handler, 2);
             var provider = services.BuildServiceProvider();
             var bus = DefaultBus(provider);
 

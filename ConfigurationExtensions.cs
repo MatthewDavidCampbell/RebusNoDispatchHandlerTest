@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Rebus.Activation;
 using Rebus.Bus;
 using Rebus.Config;
@@ -80,7 +81,7 @@ namespace Rebus.NoDispatchHandlers.Tests
         ) {
             // backoff + options + lifetime events + router + subscription storage + data bus
             services.AddSingleton<IBackoffStrategy,FakeBackoffStrategy>();
-            services.AddSingleton<Options>(new Options());
+            services.TryAddSingleton<Options>(new Options());
             services.AddSingleton<BusLifetimeEvents>(new BusLifetimeEvents());
             services.AddSingleton<IRouter>(provider => new TypeBasedRouter(provider.GetRequiredService<IRebusLoggerFactory>()));
             services.AddSingleton<ISubscriptionStorage>(new FakeSubscriptionStorage());
