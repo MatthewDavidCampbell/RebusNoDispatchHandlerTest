@@ -6,7 +6,7 @@ using System.Linq;
 using Rebus.Retry;
 using Rebus.Retry.Simple;
 
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Fakes
 {
     public class FakeErrorTracker : IErrorTracker
     {
@@ -20,7 +20,7 @@ namespace Rebus.NoDispatchHandlers.Tests
 
         public void CleanUp(string messageId)
         {
-            // Nothing
+            _exceptionCache.TryRemove(messageId, out var _);
         }
 
         public IEnumerable<Exception> GetExceptions(string messageId)
@@ -32,18 +32,20 @@ namespace Rebus.NoDispatchHandlers.Tests
 
         public string GetFullErrorDescription(string messageId)
         {
-            return messageId;
+            return GetShortErrorDescription(messageId);
         }
 
         public string GetShortErrorDescription(string messageId)
         {
-            return messageId;
+            return _exceptionCache.TryGetValue(messageId, out var exceptions) ?
+                $"{exceptions.Count} unhandled exceptions" :
+                null;
         }
 
         public bool HasFailedTooManyTimes(string messageId)
         {
-            return _exceptionCache.ContainsKey(messageId) ?
-                _exceptionCache[messageId].Count > Options.MaxDeliveryAttempts : 
+            return _exceptionCache.TryGetValue(messageId, out var exceptions) ?
+                exceptions.Count > Options.MaxDeliveryAttempts : 
                 false;
         }
 

@@ -4,7 +4,7 @@ using Rebus.Messages;
 using Rebus.Retry;
 using Rebus.Transport;
 
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Fakes
 {
     public class FakeErrorHandler : IErrorHandler
     {

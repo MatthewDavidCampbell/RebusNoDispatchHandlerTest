@@ -11,7 +11,7 @@ using Rebus.Serialization;
 /// <summary>
 /// NOTE: Copied from the Rebus repo (latest)
 /// </summary>
-namespace Rebus.NoDispatchHandlers.Tests
+namespace Rebus.NoDispatchHandlers.Tests.Clones
 {
     public class JsonSerializer : ISerializer
     {
