@@ -24,14 +24,12 @@ namespace Rebus.NoDispatchHandlers.Tests.Handlers
 
         public Task Handle(TimebombChangedEvent message)
         {
-            Interlocked.Increment(ref _handleCalled);
+            if (Interlocked.Increment(ref _handleCalled) >= Threshold) {
+                _whenThreshold.Set();
+            }
 
             if (message.isTimebomb) {
                 throw new TimebombException(MessageContext.Current.TransportMessage.GetMessageId());
-            }
-
-            if (Thread.VolatileRead(ref _handleCalled) >= Threshold) {
-                _whenThreshold.Set();
             }
 
             return Task.CompletedTask;

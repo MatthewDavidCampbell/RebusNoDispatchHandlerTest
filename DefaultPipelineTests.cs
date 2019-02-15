@@ -126,15 +126,9 @@ namespace Rebus.NoDispatchHandlers.Tests
             await Task.WhenAll(calls);
 
             // Assert
-            var errorTracker = provider.GetService<IErrorTracker>();
             var invoker = provider.GetService<IPipelineInvoker>() as DefaultPipelineInvoker;
-            var distinctExceptions = Enumerable.Range(1, 10)
-                .Where(x => x % 2 == 0)
-                .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
-                .GroupBy(x => x.Name)
-                .Select(x => x.Key);
-
-            Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
             Assert.Equal(5, invoker.NumberOfCompleted);
         }
 
@@ -158,15 +152,9 @@ namespace Rebus.NoDispatchHandlers.Tests
             await Task.WhenAll(calls);
 
             // Assert
-            var errorTracker = provider.GetService<IErrorTracker>();
             var invoker = provider.GetService<IPipelineInvoker>() as DefaultPipelineInvoker;
-            var distinctExceptions = Enumerable.Range(1, howMany)
-                .Where(x => x % 2 == 0)
-                .Select(x => errorTracker.GetExceptions(x.ToString()).First().GetType())
-                .GroupBy(x => x.Name)
-                .Select(x => x.Key);
-
-            Assert.Equal(nameof(TimebombException), distinctExceptions.Single());
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
             Assert.Equal((int)(howMany / 2), invoker.NumberOfCompleted);
         }
     }
