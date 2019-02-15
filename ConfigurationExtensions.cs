@@ -5,6 +5,7 @@ using Rebus.Activation;
 using Rebus.Bus;
 using Rebus.Config;
 using Rebus.DataBus;
+using Rebus.Handlers;
 using Rebus.Logging;
 using Rebus.NoDispatchHandlers.Tests.Clones;
 using Rebus.NoDispatchHandlers.Tests.Fakes;
@@ -29,11 +30,10 @@ namespace Rebus.NoDispatchHandlers.Tests
 
         public static IServiceCollection WithDefaultPipeline(
             this IServiceCollection services,
-            IHandlerActivator activator,
-            string queueName
+            string queueName = "defaultQueue"
         ) {
             // handler activator
-            services.AddSingleton<IHandlerActivator>(activator);
+            services.AddSingleton<IHandlerActivator>(provider => new DependencyInjectionHandlerActivator(provider));
 
             // settings, error tracker + handler, logging, serializer
             services.AddSingleton<SimpleRetryStrategySettings>(new SimpleRetryStrategySettings {

@@ -15,11 +15,22 @@ namespace Rebus.NoDispatchHandlers.Tests
 
         public const string DefaultQueue = "queue";
 
+        /// <summary>
+        /// Yield a bus with a default pipeline receiving from 
+        /// the default queue using a singleton handler for 
+        /// Timebomb changes
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <returns></returns>
         public static IBus DefaultBus(
             IHandleMessages<TimebombChangedEvent> handler
         ) {
-            var services = new ServiceCollection()
-                .WithDefaultPipeline(new BuiltinHandlerActivator().Register(() => handler), "queue")
+            var services = new ServiceCollection();
+
+            services.AddSingleton<IHandleMessages<TimebombChangedEvent>>(handler);
+
+            services
+                .WithDefaultPipeline(DefaultQueue)
                 .UseInMemoryBus();
             var provider = services.BuildServiceProvider();
 
@@ -30,18 +41,20 @@ namespace Rebus.NoDispatchHandlers.Tests
         }
 
 
-        [Fact]
-        public async Task When_SendingWithDuds_ItShould_Complete()
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_SendingWithDuds_ItShould_Complete(int numberOfMessages)
         {
             // Arrange
-            var numberOfMessages = 10;
             var handler = new TimebombChangedThresholdHandler(numberOfMessages);
             var bus = DefaultBus(handler);
 
             // Act
             var calls = Enumerable
                 .Range(1, numberOfMessages)
-                .Select(x => bus.Advanced.Routing.Send("queue", new TimebombChangedEvent()));
+                .Select(x => bus.Advanced.Routing.Send(DefaultQueue, new TimebombChangedEvent()));
             await Task.WhenAll(calls);
 
             await handler.WaitThresholdAsync();   

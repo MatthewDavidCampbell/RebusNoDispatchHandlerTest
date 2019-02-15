@@ -35,7 +35,7 @@ namespace Rebus.NoDispatchHandlers.Tests.Fakes
 
         public void OnDisposed(Action disposedAction)
         {
-            disposedAction();
+            disposedAction();  // will dispose scope for handlers
         }
 
         public void Abort()
