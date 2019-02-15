@@ -18,10 +18,14 @@ namespace Rebus.NoDispatchHandlers.Tests.Fakes
 
         public ConcurrentDictionary<string, List<Exception>> _exceptionCache = new ConcurrentDictionary<string, List<Exception>>();
 
+        public HashSet<Type> _exceptionKinds = new HashSet<Type>();
+
         public void CleanUp(string messageId)
         {
             _exceptionCache.TryRemove(messageId, out var _);
         }
+
+        public HashSet<Type> ExceptionKinds => _exceptionKinds;
 
         public IEnumerable<Exception> GetExceptions(string messageId)
         {
@@ -64,6 +68,7 @@ namespace Rebus.NoDispatchHandlers.Tests.Fakes
                     return acc;
                 }
             );
+            _exceptionKinds.Add(exception.GetType());
         }
     }
 }

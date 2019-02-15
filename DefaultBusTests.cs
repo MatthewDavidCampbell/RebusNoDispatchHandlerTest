@@ -5,8 +5,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Rebus.Activation;
 using Rebus.Bus;
+using Rebus.Config;
 using Rebus.Handlers;
+using Rebus.NoDispatchHandlers.Tests.Exceptions;
+using Rebus.NoDispatchHandlers.Tests.Fakes;
 using Rebus.NoDispatchHandlers.Tests.Handlers;
+using Rebus.Retry;
 using Xunit;
 
 namespace Rebus.NoDispatchHandlers.Tests
@@ -16,13 +20,12 @@ namespace Rebus.NoDispatchHandlers.Tests
         public const string DefaultQueue = "queue";
 
         /// <summary>
-        /// Yield a bus with a default pipeline receiving from 
-        /// the default queue using a singleton handler for 
-        /// Timebomb changes
+        /// Default services with a singleton for Timebomb changed 
+        /// hanlder running against the default queue
         /// </summary>
         /// <param name="handler"></param>
         /// <returns></returns>
-        public static IBus DefaultBus(
+        public static IServiceCollection DefaultServices(
             IHandleMessages<TimebombChangedEvent> handler
         ) {
             var services = new ServiceCollection();
@@ -32,10 +35,19 @@ namespace Rebus.NoDispatchHandlers.Tests
             services
                 .WithDefaultPipeline(DefaultQueue)
                 .UseInMemoryBus();
-            var provider = services.BuildServiceProvider();
+            return services;
+        }
 
+        /// <summary>
+        /// Yield | start bus
+        /// </summary>
+        /// <param name="handler"></param>
+        /// <returns></returns>
+        public static IBus DefaultBus(
+            IServiceProvider provider
+        ) {
             var bus = provider.GetService<RebusBus>();
-            bus.Start(1);
+            bus.Start(provider.GetService<Options>().NumberOfWorkers);
 
             return bus;
         }
@@ -49,7 +61,9 @@ namespace Rebus.NoDispatchHandlers.Tests
         {
             // Arrange
             var handler = new TimebombChangedThresholdHandler(numberOfMessages);
-            var bus = DefaultBus(handler);
+            var services = DefaultServices(handler);
+            var provider = services.BuildServiceProvider();
+            var bus = DefaultBus(provider);
 
             // Act
             var calls = Enumerable
@@ -61,6 +75,35 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             Assert.Equal(numberOfMessages, handler.HandleCalled);
+        }
+
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_SendingWithBombs_ItShould_Retry(int numberOfMessages)
+        {
+            // Arrange
+            var handler = new TimebombChangedThresholdHandler(numberOfMessages * 6);
+            var services = DefaultServices(handler);
+            var provider = services.BuildServiceProvider();
+            var bus = DefaultBus(provider);
+
+            // Act
+            var calls = Enumerable
+                .Range(1, numberOfMessages)
+                .Select(x => bus.Advanced.Routing.Send(
+                    DefaultQueue, 
+                    new TimebombChangedEvent { isTimebomb = true }
+                ));
+            await Task.WhenAll(calls);
+            await handler.WaitThresholdAsync(); 
+
+            // Assert
+            Assert.Equal(numberOfMessages * 6, handler.HandleCalled);
+
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
         }
     }
 }
