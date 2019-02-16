@@ -49,7 +49,7 @@ namespace Rebus.NoDispatchHandlers.Tests.Fakes
         public bool HasFailedTooManyTimes(string messageId)
         {
             return _exceptionCache.TryGetValue(messageId, out var exceptions) ?
-                exceptions.Count > Options.MaxDeliveryAttempts : 
+                exceptions.Count >= Options.MaxDeliveryAttempts : 
                 false;
         }
 

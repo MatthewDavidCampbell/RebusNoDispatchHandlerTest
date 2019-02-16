@@ -11,6 +11,7 @@ using Rebus.NoDispatchHandlers.Tests.Exceptions;
 using Rebus.NoDispatchHandlers.Tests.Fakes;
 using Rebus.NoDispatchHandlers.Tests.Handlers;
 using Rebus.Retry;
+using Rebus.Retry.Simple;
 using Xunit;
 
 namespace Rebus.NoDispatchHandlers.Tests
@@ -18,6 +19,11 @@ namespace Rebus.NoDispatchHandlers.Tests
     public class DefaultBusTests {
 
         public const string DefaultQueue = "queue";
+
+        public static SimpleRetryStrategySettings SimpleRetryStrategySettings = new SimpleRetryStrategySettings {
+            MaxDeliveryAttempts = 2,
+            SecondLevelRetriesEnabled = true
+        };
 
         /// <summary>
         /// Default services with a singleton for Timebomb changed 
@@ -31,8 +37,12 @@ namespace Rebus.NoDispatchHandlers.Tests
         ) {
             var services = new ServiceCollection();
 
-            services.AddSingleton<Options>(new Options { NumberOfWorkers = numberOfWorkers });
+            services.AddSingleton<Options>(new Options { 
+                NumberOfWorkers = numberOfWorkers 
+            });
+            services.AddSingleton<SimpleRetryStrategySettings>(SimpleRetryStrategySettings);
             services.AddSingleton<IHandleMessages<TimebombChangedEvent>>(handler);
+            services.AddTransient<IHandleMessages<ChangedEvent>, ChangedHandler>();
 
             services
                 .WithDefaultPipeline(DefaultQueue)
@@ -84,40 +94,11 @@ namespace Rebus.NoDispatchHandlers.Tests
         [InlineData(100)]
         [InlineData(500)]
         [InlineData(1000)]
-        public async Task When_SendingWithBombs_ItShould_Retry(int numberOfMessages)
-        {
-            // Arrange
-            var handler = new TimebombChangedThresholdHandler(numberOfMessages * 6);
-            var services = DefaultServices(handler);
-            var provider = services.BuildServiceProvider();
-            var bus = DefaultBus(provider);
-
-            // Act
-            var calls = Enumerable
-                .Range(1, numberOfMessages)
-                .Select(x => bus.Advanced.Routing.Send(
-                    DefaultQueue, 
-                    new TimebombChangedEvent { isTimebomb = true }
-                ));
-            await Task.WhenAll(calls);
-            await handler.WaitThresholdAsync(); 
-
-            // Assert
-            Assert.Equal(numberOfMessages * 6, handler.HandleCalled);
-
-            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
-            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
-        }
-
-        [Theory]
-        [InlineData(100)]
-        [InlineData(500)]
-        [InlineData(1000)]
         public async Task When_SendingWithHalfBombs_ItShould_Retry(int numberOfMessages)
         {
             // Arrange
-            var numberOfCalls = (numberOfMessages * 6 + numberOfMessages) / 2;
-            var handler = new TimebombChangedThresholdHandler(numberOfCalls);
+            var numberOfTimebombCalls = (numberOfMessages * SimpleRetryStrategySettings.MaxDeliveryAttempts * 2 + numberOfMessages) / 2;
+            var handler = new TimebombChangedThresholdHandler(numberOfTimebombCalls);
             var services = DefaultServices(handler, 2);
             var provider = services.BuildServiceProvider();
             var bus = DefaultBus(provider);
@@ -127,13 +108,45 @@ namespace Rebus.NoDispatchHandlers.Tests
                 .Range(1, numberOfMessages)
                 .Select(x => bus.Advanced.Routing.Send(
                     DefaultQueue, 
-                    new TimebombChangedEvent { isTimebomb = x % 2 == 0 }
+                    (ChangedEvent) new TimebombChangedEvent { isTimebomb = x % 2 == 0 }
                 ));
             await Task.WhenAll(calls);
             await handler.WaitThresholdAsync(); 
 
             // Assert
-            Assert.Equal(numberOfCalls, handler.HandleCalled);
+            Assert.Equal(numberOfTimebombCalls, handler.HandleCalled);
+
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
+        }
+
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_SendingWithBombsAndChanged_ItShould_Retry(int numberOfMessages)
+        {
+            // Arrange
+            var numberOfTimebombCalls = (numberOfMessages * SimpleRetryStrategySettings.MaxDeliveryAttempts * 2) / 2;
+            var handler = new TimebombChangedThresholdHandler(numberOfTimebombCalls);
+            var services = DefaultServices(handler, 2);
+            var provider = services.BuildServiceProvider();
+            var bus = DefaultBus(provider);
+
+            // Act
+            var calls = Enumerable
+                .Range(1, numberOfMessages)
+                .Select(x => bus.Advanced.Routing.Send(
+                    DefaultQueue,
+                    x % 2 == 0 ? 
+                        new ChangedEvent {} :
+                        new TimebombChangedEvent { isTimebomb = true } 
+                ));
+            await Task.WhenAll(calls);
+            await handler.WaitThresholdAsync(); 
+
+            // Assert
+            Assert.Equal(numberOfTimebombCalls, handler.HandleCalled);
 
             var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
             Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);

@@ -37,7 +37,7 @@ namespace Rebus.NoDispatchHandlers.Tests
             services.AddSingleton<IHandlerActivator>(provider => new DependencyInjectionHandlerActivator(provider));
 
             // settings, error tracker + handler, logging, serializer
-            services.AddSingleton<SimpleRetryStrategySettings>(new SimpleRetryStrategySettings {
+            services.TryAddSingleton<SimpleRetryStrategySettings>(new SimpleRetryStrategySettings {
                 MaxDeliveryAttempts = 2,
                 SecondLevelRetriesEnabled = true
             });
