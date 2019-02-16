@@ -42,7 +42,28 @@ namespace Rebus.NoDispatchHandlers.Tests
             });
             services.AddSingleton<SimpleRetryStrategySettings>(SimpleRetryStrategySettings);
             services.AddSingleton<IHandleMessages<TimebombChangedEvent>>(handler);
+            services.AddTransient<ISomeDependency, SomeDependency>();
             services.AddTransient<IHandleMessages<ChangedEvent>, ChangedHandler>();
+
+            services
+                .WithDefaultPipeline(DefaultQueue)
+                .UseInMemoryBus();
+            return services;
+        }
+
+        public static IServiceCollection MultiHanlderServices(
+            IHandleMessages<TimebombChangedEvent> handler1,
+            IHandleMessages<ChangedEvent> handler2,
+            int numberOfWorkers = 1
+        ) {
+            var services = new ServiceCollection();
+
+            services.AddSingleton<Options>(new Options { 
+                NumberOfWorkers = numberOfWorkers 
+            });
+            services.AddSingleton<SimpleRetryStrategySettings>(SimpleRetryStrategySettings);
+            services.AddSingleton<IHandleMessages<TimebombChangedEvent>>(handler1);
+            services.AddSingleton<IHandleMessages<ChangedEvent>>(handler2);
 
             services
                 .WithDefaultPipeline(DefaultQueue)
@@ -147,6 +168,38 @@ namespace Rebus.NoDispatchHandlers.Tests
 
             // Assert
             Assert.Equal(numberOfTimebombCalls, handler.HandleCalled);
+
+            var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
+            Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
+        }
+
+        [Theory]
+        [InlineData(100)]
+        [InlineData(500)]
+        [InlineData(1000)]
+        public async Task When_SendingAtMultipleHandler_ItShould_Retry(int numberOfMessages)
+        {
+            // Arrange
+            var numberOfCalls = (numberOfMessages * SimpleRetryStrategySettings.MaxDeliveryAttempts) + (numberOfMessages / 2);
+            var handler = new MultipleThresholdHandler(numberOfCalls);
+            var services = MultiHanlderServices(handler, handler);
+            var provider = services.BuildServiceProvider();
+            var bus = DefaultBus(provider);
+
+            // Act
+            var calls = Enumerable
+                .Range(1, numberOfMessages)
+                .Select(x => bus.Advanced.Routing.Send(
+                    DefaultQueue,
+                    x % 2 == 0 ? 
+                        new ChangedEvent {} :
+                        new TimebombChangedEvent { isTimebomb = true } 
+                ));
+            await Task.WhenAll(calls);
+            await handler.WaitThresholdAsync(); 
+
+            // Assert
+            Assert.Equal(numberOfCalls, handler.HandleCalled);
 
             var errorTracker = provider.GetService<IErrorTracker>() as FakeErrorTracker;
             Assert.Equal(nameof(TimebombException),errorTracker.ExceptionKinds.Single().Name);
